@@ -216,13 +216,20 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- Firebase Configuration ---
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const firebaseConfig = {
+              apiKey: "AIzaSyCjcScdl8RwncM4UNHr18ZF_ohU5nh6O-w",
+              authDomain: "jurnal-harian-401d2.firebaseapp.com",
+              projectId: "jurnal-harian-401d2",
+              storageBucket: "jurnal-harian-401d2.appspot.com",
+              messagingSenderId: "660517356631",
+              appId: "1:660517356631:web:db3f1d61648f8ea7998f12",
+              measurementId: "G-NNZVHNBN7P"
+            };
 
             // --- Initialize Firebase ---
             const app = initializeApp(firebaseConfig);
@@ -233,21 +240,17 @@
             let allJournals = [];
 
             // --- Authentication ---
-            onAuthStateChanged(auth, async (user) => {
+            onAuthStateChanged(auth, (user) => {
                 if (user) {
+                    // User is signed in.
                     userId = user.uid;
                     document.getElementById('userIdDisplay').textContent = `User ID: ${userId}`;
                     fetchJournals();
                 } else {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                        console.error("Authentication failed:", error);
-                    }
+                    // User is signed out. Sign in anonymously for this session.
+                    signInAnonymously(auth).catch((error) => {
+                        console.error("Gagal masuk secara anonim:", error);
+                    });
                 }
             });
 
@@ -293,7 +296,8 @@
             // --- Firestore Logic ---
             function fetchJournals() {
                 if (!userId) return;
-                const journalsCollectionPath = `/artifacts/${appId}/users/${userId}/journals`;
+                // Path data disederhanakan untuk proyek Firebase mandiri
+                const journalsCollectionPath = `users/${userId}/journals`;
                 const q = query(collection(db, journalsCollectionPath));
 
                 onSnapshot(q, (snapshot) => {
@@ -492,7 +496,7 @@
                         status: document.querySelector('input[name="status"]:checked').value,
                         createdAt: serverTimestamp()
                     };
-                    const journalsCollectionPath = `/artifacts/${appId}/users/${userId}/journals`;
+                    const journalsCollectionPath = `users/${userId}/journals`;
                     await addDoc(collection(db, journalsCollectionPath), journalData);
                     showNotification();
                     journalFormElement.reset();

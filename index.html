@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jurnal Harian Guru - SDN 008 Purnama</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Library for Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .notification {
+            transform: translate(-50%, -150px);
+            transition: transform 0.5s ease-in-out;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            z-index: 100;
+        }
+        .notification.show {
+            transform: translate(-50%, 0);
+        }
+        .dropdown {
+            display: none;
+            position: absolute;
+            z-index: 100;
+        }
+        .dropdown.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex flex-col">
+        <!-- Notifications -->
+        <div id="notification" class="notification bg-green-500 text-white text-center py-3 px-6 shadow-lg rounded-md">
+            <p class="font-medium">Jurnal berhasil disimpan!</p>
+        </div>
+        <div id="error-notification" class="notification bg-red-500 text-white text-center py-3 px-6 shadow-lg rounded-md">
+            <p id="error-message" class="font-medium">Terjadi kesalahan.</p>
+        </div>
+
+        <!-- Header -->
+        <header class="bg-blue-600 text-white py-4 shadow-md">
+            <div class="container mx-auto px-4 flex flex-col items-center gap-2">
+                <img src="https://iili.io/FjH584s.png" alt="Logo SDN 008 Purnama" class="h-20 w-20 object-contain" onerror="this.style.display='none'">
+                <div class="text-center">
+                    <h1 class="text-xl sm:text-2xl md:text-3xl font-bold">Jurnal Harian Guru</h1>
+                    <p class="text-lg sm:text-xl md:text-2xl font-semibold">SDN 008 Purnama</p>
+                </div>
+            </div>
+            <p id="userIdDisplay" class="text-center text-sm mt-2 text-blue-200"></p>
+        </header>
+
+        <!-- Navigation Menu -->
+        <nav class="bg-blue-700 text-white py-2 shadow-md">
+            <div class="container mx-auto px-4 flex justify-center items-center flex-wrap gap-4">
+                <button id="homeBtn" class="px-4 py-2 hover:bg-blue-800 rounded-md transition duration-300 font-medium">
+                    <i class="fas fa-home mr-2"></i>Beranda
+                </button>
+                <button id="rekapMenuBtn" class="px-4 py-2 hover:bg-blue-800 rounded-md transition duration-300 font-medium">
+                    <i class="fas fa-table mr-2"></i>Rekap
+                </button>
+                <div class="relative">
+                    <button id="exportBtn" class="px-4 py-2 hover:bg-blue-800 rounded-md transition duration-300 font-medium">
+                        <i class="fas fa-file-excel mr-2"></i>Export Excel
+                    </button>
+                    <div id="exportDropdown" class="dropdown bg-white shadow-lg rounded-md mt-1 w-48">
+                        <div class="p-3">
+                            <h3 class="text-gray-800 font-medium mb-2">Pilih Kelas</h3>
+                             <div id="exportClassList" class="grid grid-cols-2 gap-2">
+                                <!-- Dynamically populated -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-grow container mx-auto px-4 py-8">
+            <!-- Rekap View (Hidden by default) -->
+            <div id="rekapView" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-7xl mx-auto mb-8">
+                <div class="flex flex-col md:flex-row justify-between items-start mb-6 gap-6">
+                    <h2 class="text-2xl font-bold text-gray-800 flex-shrink-0">Rekap Jurnal</h2>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-6 w-full">
+                        <div class="flex items-center gap-2">
+                            <label for="classFilter" class="text-gray-700 font-medium">Kelas:</label>
+                            <select id="classFilter" class="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <!-- Dynamically populated -->
+                            </select>
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <label class="text-gray-700 font-medium pt-1">Jam Pelajaran:</label>
+                            <div id="jpFilterCheckboxes" class="flex flex-wrap gap-x-4 gap-y-2">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="jp-all" value="all" class="jp-filter-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                    <label for="jp-all" class="ml-2 text-gray-700">Semua</label>
+                                </div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-1" value="1" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-1" class="ml-2 text-gray-700">1</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-2" value="2" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-2" class="ml-2 text-gray-700">2</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-3" value="3" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-3" class="ml-2 text-gray-700">3</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-4" value="4" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-4" class="ml-2 text-gray-700">4</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-5" value="5" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-5" class="ml-2 text-gray-700">5</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-6" value="6" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-6" class="ml-2 text-gray-700">6</label></div>
+                                <div class="flex items-center"><input type="checkbox" id="jp-7" value="7" class="jp-filter-cb-individual h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="jp-7" class="ml-2 text-gray-700">7</label></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white border border-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Hari/Tanggal</th>
+                                <th class="py-2 px-4 border-b text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">JP Ke-</th>
+                                <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Mata Pelajaran</th>
+                                <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Bab</th>
+                                <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Materi Pokok</th>
+                                <th class="py-2 px-4 border-b text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rekapTableBody">
+                            <!-- Data will be populated from Firestore -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Journal Form -->
+            <div id="journalFormContainer" class="bg-white rounded-lg shadow-lg p-6 max-w-3xl mx-auto">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">Buat Jurnal Baru</h2>
+                <form id="journalFormElement" class="space-y-6">
+                     <div class="form-group">
+                        <label for="class" class="block text-gray-700 font-medium mb-2">Kelas</label>
+                        <select id="class" name="class" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="" disabled selected>Pilih Kelas</option>
+                            <option value="3A">3A</option><option value="3B">3B</option><option value="3C">3C</option><option value="3D">3D</option>
+                            <option value="4A">4A</option><option value="4B">4B</option><option value="4C">4C</option><option value="4D">4D</option>
+                        </select>
+                    </div>
+                     <!-- Jam Pelajaran Checkboxes -->
+                    <div class="form-group">
+                        <label class="block text-gray-700 font-medium mb-2">Jam Pelajaran ke-</label>
+                        <div id="jamPelajaranCheckboxes" class="flex flex-wrap gap-x-4 gap-y-2">
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-1" value="1" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-1" class="ml-2 text-gray-700">1</label></div>
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-2" value="2" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-2" class="ml-2 text-gray-700">2</label></div>
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-3" value="3" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-3" class="ml-2 text-gray-700">3</label></div>
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-4" value="4" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-4" class="ml-2 text-gray-700">4</label></div>
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-5" value="5" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-5" class="ml-2 text-gray-700">5</label></div>
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-6" value="6" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-6" class="ml-2 text-gray-700">6</label></div>
+                            <div class="flex items-center"><input type="checkbox" id="form-jp-7" value="7" class="form-jp-cb h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"><label for="form-jp-7" class="ml-2 text-gray-700">7</label></div>
+                        </div>
+                    </div>
+                    <!-- Date -->
+                    <div class="form-group">
+                        <label for="date" class="block text-gray-700 font-medium mb-2">Hari/Tanggal</label>
+                        <input type="date" id="date" name="date" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <!-- Subject -->
+                    <div class="form-group">
+                        <label for="subject" class="block text-gray-700 font-medium mb-2">Mata Pelajaran</label>
+                        <select id="subject" name="subject" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="" disabled selected>Pilih Mata Pelajaran</option>
+                            <option value="P. Pancasila">P. Pancasila</option><option value="Matematika">Matematika</option>
+                            <option value="Bahasa Indonesia">Bahasa Indonesia</option><option value="IPAS">IPAS</option><option value="Seni Rupa">Seni Rupa</option>
+                        </select>
+                    </div>
+                    <!-- Chapter -->
+                    <div class="form-group">
+                        <label for="chapter" class="block text-gray-700 font-medium mb-2">Bab</label>
+                        <input type="text" id="chapter" name="chapter" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Bab 3">
+                    </div>
+                    <!-- Main Material -->
+                    <div class="form-group">
+                        <label for="material" class="block text-gray-700 font-medium mb-2">Materi Pokok</label>
+                        <input type="text" id="material" name="material" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan materi pokok">
+                    </div>
+                    <!-- Learning Activities -->
+                    <div class="form-group">
+                        <label for="activities" class="block text-gray-700 font-medium mb-2">Kegiatan Pembelajaran</label>
+                        <textarea id="activities" name="activities" rows="4" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Jelaskan kegiatan pembelajaran yang dilakukan"></textarea>
+                    </div>
+                    <!-- Status -->
+                    <div class="form-group">
+                        <label class="block text-gray-700 font-medium mb-2">Status</label>
+                        <div class="space-y-2">
+                            <div class="flex items-center"><input type="radio" id="completed" name="status" value="Selesai" required class="h-4 w-4 text-blue-600 focus:ring-blue-500"><label for="completed" class="ml-2 text-gray-700">Selesai</label></div>
+                            <div class="flex items-center"><input type="radio" id="incomplete" name="status" value="Belum Selesai" class="h-4 w-4 text-blue-600 focus:ring-blue-500"><label for="incomplete" class="ml-2 text-gray-700">Belum Selesai</label></div>
+                            <div class="flex items-center"><input type="radio" id="repeat" name="status" value="Perlu Pengulangan" class="h-4 w-4 text-blue-600 focus:ring-blue-500"><label for="repeat" class="ml-2 text-gray-700">Perlu Pengulangan</label></div>
+                        </div>
+                    </div>
+                    <!-- Submit Button -->
+                    <div class="form-group">
+                        <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <i class="fas fa-save mr-2"></i>Simpan Jurnal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-800 text-white py-4 mt-8">
+            <div class="container mx-auto px-4 text-center">
+                <p>&copy; Junid 2025 Jurnal Harian Guru</p>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Firebase Configuration ---
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+            // --- Initialize Firebase ---
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            let userId = null;
+            let allJournals = [];
+
+            // --- Authentication ---
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    document.getElementById('userIdDisplay').textContent = `User ID: ${userId}`;
+                    fetchJournals();
+                } else {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Authentication failed:", error);
+                    }
+                }
+            });
+
+            // --- DOM Elements ---
+            const homeBtn = document.getElementById('homeBtn');
+            const rekapMenuBtn = document.getElementById('rekapMenuBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const exportDropdown = document.getElementById('exportDropdown');
+            const exportClassList = document.getElementById('exportClassList');
+            const rekapView = document.getElementById('rekapView');
+            const journalFormContainer = document.getElementById('journalFormContainer');
+            const rekapTableBody = document.getElementById('rekapTableBody');
+            const journalFormElement = document.getElementById('journalFormElement');
+            const dateInput = document.getElementById('date');
+            const submitBtn = document.getElementById('submitBtn');
+            const classFilter = document.getElementById('classFilter');
+            const allJpCheckbox = document.getElementById('jp-all');
+            const individualJpCheckboxes = document.querySelectorAll('.jp-filter-cb-individual');
+
+            // --- Utility Functions ---
+            function showNotification(message = 'Jurnal berhasil disimpan!', isError = false) {
+                const notificationId = isError ? 'error-notification' : 'notification';
+                const notification = document.getElementById(notificationId);
+                notification.querySelector('p').textContent = message;
+                notification.classList.add('show');
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 3000);
+            }
+
+            function formatDate(date) {
+                const d = new Date(date);
+                const userTimezoneOffset = d.getTimezoneOffset() * 60000;
+                const adjustedDate = new Date(d.getTime() + userTimezoneOffset);
+                const day = String(adjustedDate.getDate()).padStart(2, '0');
+                const month = String(adjustedDate.getMonth() + 1).padStart(2, '0');
+                const year = adjustedDate.getFullYear();
+                const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                const dayName = days[adjustedDate.getDay()];
+                return `${dayName}, ${day}/${month}/${year}`;
+            }
+
+            // --- Firestore Logic ---
+            function fetchJournals() {
+                if (!userId) return;
+                const journalsCollectionPath = `/artifacts/${appId}/users/${userId}/journals`;
+                const q = query(collection(db, journalsCollectionPath));
+
+                onSnapshot(q, (snapshot) => {
+                    allJournals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                        .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+                    
+                    populateFilters();
+                    applyFilters();
+                }, (error) => {
+                    console.error("Gagal memuat data jurnal: ", error);
+                });
+            }
+
+            // --- UI & Filter Logic ---
+            function populateFilters() {
+                const uniqueClasses = [...new Set(allJournals.map(j => j.className))].sort();
+                
+                classFilter.innerHTML = '<option value="all">Semua Kelas</option>';
+                uniqueClasses.forEach(c => {
+                    classFilter.innerHTML += `<option value="${c}">${c}</option>`;
+                });
+
+                exportClassList.innerHTML = '';
+                 uniqueClasses.forEach(c => {
+                    const button = document.createElement('button');
+                    button.dataset.class = c;
+                    button.className = 'export-class-btn bg-green-100 hover:bg-green-200 text-green-800 py-1 px-2 rounded text-sm transition';
+                    button.textContent = c;
+                    exportClassList.appendChild(button);
+                });
+            }
+            
+            function applyFilters() {
+                const selectedClass = classFilter.value;
+                
+                const selectedJps = [];
+                if (!allJpCheckbox.checked) {
+                    document.querySelectorAll('.jp-filter-cb-individual:checked').forEach(cb => {
+                        selectedJps.push(cb.value);
+                    });
+                }
+
+                let filteredData = allJournals;
+
+                if (selectedClass !== 'all') {
+                    filteredData = filteredData.filter(j => j.className === selectedClass);
+                }
+
+                if (!allJpCheckbox.checked && selectedJps.length > 0) {
+                    filteredData = filteredData.filter(j => {
+                        if (Array.isArray(j.jamPelajaran)) {
+                            return j.jamPelajaran.some(jp => selectedJps.includes(jp));
+                        } else if (j.jamPelajaran) { // Handle old string data
+                            return selectedJps.includes(j.jamPelajaran);
+                        }
+                        return false;
+                    });
+                } else if (!allJpCheckbox.checked && selectedJps.length === 0) {
+                    filteredData = [];
+                }
+                
+                loadRekapData(filteredData);
+            }
+
+            classFilter.addEventListener('change', applyFilters);
+            allJpCheckbox.addEventListener('change', () => {
+                individualJpCheckboxes.forEach(cb => {
+                    cb.checked = false;
+                });
+                if (allJpCheckbox.checked) {
+                    applyFilters();
+                }
+            });
+
+            individualJpCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    if (cb.checked) {
+                        allJpCheckbox.checked = false;
+                    }
+                    const anyChecked = Array.from(individualJpCheckboxes).some(i => i.checked);
+                    if (!anyChecked) {
+                        allJpCheckbox.checked = true;
+                    }
+                    applyFilters();
+                });
+            });
+
+            dateInput.value = new Date().toISOString().substr(0, 10);
+
+            document.addEventListener('click', (e) => {
+                if (!exportBtn.contains(e.target) && !exportDropdown.contains(e.target)) {
+                    exportDropdown.classList.remove('show');
+                }
+                if (e.target.classList.contains('export-class-btn')) {
+                    const classValue = e.target.dataset.class;
+                    const filteredData = allJournals.filter(j => j.className === classValue);
+                    exportDropdown.classList.remove('show');
+                    
+                    if (filteredData.length === 0) {
+                        showNotification(`Tidak ada data untuk diekspor dari kelas ${classValue}.`, true);
+                        return;
+                    }
+                    exportToExcel(filteredData, classValue);
+                }
+            });
+
+            exportBtn.addEventListener('click', () => exportDropdown.classList.toggle('show'));
+            homeBtn.addEventListener('click', () => {
+                rekapView.classList.add('hidden');
+                journalFormContainer.classList.remove('hidden');
+            });
+            rekapMenuBtn.addEventListener('click', () => {
+                journalFormContainer.classList.add('hidden');
+                rekapView.classList.remove('hidden');
+                applyFilters();
+            });
+
+            function loadRekapData(data) {
+                rekapTableBody.innerHTML = '';
+                if (data.length === 0) {
+                    rekapTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-gray-500">Tidak ada data jurnal yang sesuai dengan filter.</td></tr>`;
+                    return;
+                }
+                data.forEach(item => {
+                    const statusColor = item.status === 'Selesai' ? 'bg-green-100 text-green-800' :
+                                        item.status === 'Belum Selesai' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800';
+                    const jpDisplay = Array.isArray(item.jamPelajaran) ? item.jamPelajaran.join(', ') : item.jamPelajaran || '-';
+                    const row = `
+                        <tr class="hover:bg-gray-50">
+                            <td class="py-2 px-4 border-b">${item.date}</td>
+                            <td class="py-2 px-4 border-b text-center">${jpDisplay}</td>
+                            <td class="py-2 px-4 border-b">${item.subject}</td>
+                            <td class="py-2 px-4 border-b">${item.chapter}</td>
+                            <td class="py-2 px-4 border-b">${item.material}</td>
+                            <td class="py-2 px-4 border-b"><span class="px-2 py-1 text-xs font-semibold rounded-full ${statusColor}">${item.status}</span></td>
+                        </tr>
+                    `;
+                    rekapTableBody.innerHTML += row;
+                });
+            }
+
+            function exportToExcel(journals, className) {
+                const dataToExport = journals.map(j => ({
+                    'Hari/Tanggal': j.date,
+                    'Kelas': j.className,
+                    'Jam Pelajaran ke-': Array.isArray(j.jamPelajaran) ? j.jamPelajaran.join(', ') : j.jamPelajaran,
+                    'Mata Pelajaran': j.subject,
+                    'Bab': j.chapter,
+                    'Materi Pokok': j.material,
+                    'Kegiatan Pembelajaran': j.activities,
+                    'Status': j.status
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, `Jurnal Kelas ${className}`);
+
+                worksheet['!cols'] = [
+                    { wch: 25 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 50 }, { wch: 20 }
+                ];
+
+                const fileName = `Jurnal_Harian_Kelas_${className}.xlsx`;
+                XLSX.writeFile(workbook, fileName);
+                showNotification(`Data kelas ${className} berhasil diekspor!`);
+            }
+
+            journalFormElement.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                if (!userId) {
+                    console.error('Anda harus masuk untuk menyimpan jurnal.');
+                    return;
+                }
+
+                const selectedJps = [];
+                document.querySelectorAll('.form-jp-cb:checked').forEach(cb => {
+                    selectedJps.push(cb.value);
+                });
+
+                if (selectedJps.length === 0) {
+                    showNotification('Silakan pilih minimal satu Jam Pelajaran.', true);
+                    return;
+                }
+
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+                try {
+                    const journalData = {
+                        className: document.getElementById('class').value,
+                        jamPelajaran: selectedJps,
+                        date: formatDate(dateInput.value),
+                        subject: document.getElementById('subject').value,
+                        chapter: document.getElementById('chapter').value,
+                        material: document.getElementById('material').value,
+                        activities: document.getElementById('activities').value,
+                        status: document.querySelector('input[name="status"]:checked').value,
+                        createdAt: serverTimestamp()
+                    };
+                    const journalsCollectionPath = `/artifacts/${appId}/users/${userId}/journals`;
+                    await addDoc(collection(db, journalsCollectionPath), journalData);
+                    showNotification();
+                    journalFormElement.reset();
+                    dateInput.value = new Date().toISOString().substr(0, 10);
+                } catch (error) {
+                    console.error("Gagal menyimpan jurnal: ", error);
+                    showNotification('Gagal menyimpan jurnal.', true);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Simpan Jurnal';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
